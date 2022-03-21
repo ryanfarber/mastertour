@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@ryanforever/logger": "^4.0.2",
+    "axios": "^0.26.1",
+    "dateformat": "^4.6.3",
+    "oauth-1.0a": "^2.2.6"
+  },
+  "devDependencies": {
+    "dotenv": "^16.0.0"
+  }
+}
