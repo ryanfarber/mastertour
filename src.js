@@ -1,21 +1,26 @@
+// mastertour
 
-
-require("dotenv").config();
+require("dotenv").config()
 const Logger = require("@ryanforever/logger")
-const logger = new Logger(__filename, {debug: true})
+const logger = new Logger(__filename, {debug: false})
 const axios = require("axios")
 let Oath = require("./oath-creator.js")
 const dateformat = require("dateformat")
-
-
+const {DaySchema, ShowSchema, EventSchema, TourSchema} = require("./schemas.js")
 
 
 function Mastertour(config = {}) {
 
 	let key = config.key
 	let secret = config.secret
+
+	if (!key) throw new Error("please enter your [key]")
+	if (!secret) throw new Error("please enter your [secret]")
+
 	let defaultTourId = config.tourId
 	let url = "https://my.eventric.com/portal/api/v5/"
+	let debug = config.debug
+	if (debug) logger._debug = true
 
 	let oath = new Oath({
 		consumerKey: key,
@@ -23,8 +28,9 @@ function Mastertour(config = {}) {
 	})
 
 
-	// GET TOURS // returns the tours on mastertour
+	//! get a list of all tours on master tour
 	this.getTours = async function() {
+		logger.debug("getting tours...")
 		let request = {
 			url: "https://my.eventric.com/portal/api/v5/tours",
 			method: "GET",
@@ -37,12 +43,14 @@ function Mastertour(config = {}) {
 			throw new Error(err)
 		})
 		let data = res?.data?.data?.tours
+		data = data.map(x => new TourSchema(x))
 		return data
 	}
 
-	// GET TOUR // returns the tour
+	//! get a tour with a given ID, or the id specified in config
 	this.getTour = async function(tourId) {
 		tourId = tourId || defaultTourId
+		logger.debug(`getting tour ${tourId}...`)
 		let request = {
 			url: `https://my.eventric.com/portal/api/v5/tour/${tourId}`,
 			method: "GET",
@@ -52,13 +60,32 @@ function Mastertour(config = {}) {
 		req.params.version = 10
 
 		let res = await axios.get(request.url, req).catch(err => {
-			throw new Error(err)
+			let msg = err?.response?.data?.message
+			if (msg) throw new Error(msg)
+			else throw new Error(err)
 		})
-		let data = res?.data?.data?.tour
+		let raw = res?.data?.data?.tour
+		// console.log(data)
+		let data = new TourSchema(raw)
+		// raw.days = raw.days.map(x => x = new DaySchema(x))
 		return data
 	}
 
-	// GET DAY // returns day
+	//! returns only show days of given tour
+	this.getShowDays = async function(tourId) {
+		tourId = tourId || defaultTourId
+		logger.debug(`getting show days for tour ${tourId}...`)
+		let data = await this.getTour(tourId)
+		let days = data.days
+		let shows = days.filter(x => x.type == "show")
+		shows = shows.map(x => {
+			x.getShow = async () => this.getDay(x.id)
+			return x
+		})
+		return shows
+	}
+
+	//! get details about a specific day
 	this.getDay = async function(dayId) {
 		logger.debug(`getting day "${dayId}"...`)
 		let request = {
@@ -75,14 +102,15 @@ function Mastertour(config = {}) {
 		let data = res?.data?.data?.day
 		logger.debug("parsing day...")
 		// console.log(data)
-		let parsed = parseDay(data)
+		let parsed = new DaySchema(data)
 		console.log(parsed)
 		// return data
 	}
 
 
-	// GET TODAY // returns the current day of the tour
+	//! returns current day of tour
 	this.getToday = async function(tourId) {
+		tourId = tourId || defaultTourId
 		logger.debug("getting today's info...")
 		let tour = await this.getTour(tourId)
 		let today = new Date(Date.now()).toLocaleDateString()
@@ -95,7 +123,7 @@ function Mastertour(config = {}) {
 		else return match
 	}
 	
-	// GET DATE // returns a specific date of the tour
+	//! get a specific date of the tour
 	this.getDate = async function(inputDate) {
 		logger.debug("getting specified date...")
 		let tour = await this.getTour(tourId)
@@ -116,19 +144,19 @@ function Mastertour(config = {}) {
 		else return match
 	}
 
-	// GET SCHEDULE // 
+	//! not sure what this does
 	this.getSchedule = async function(dayId) {
 		let day = await this.getDay(dayId)
 		let items = day.scheduleItems
 		let schedule = []
 
 		// parse items //
-		items.forEach(item => schedule.push(parseScheduleEvent(item)))
+		items.forEach(item => schedule.push(new EventSchema(item)))
 		console.log(schedule)
 		return schedule
 	}
 
-	// GET EVENTS // returns events
+	//! returns events
 	this.getEvents = async function(dayId) {
 		let request = {
 			url: `https://my.eventric.com/portal/api/v5/day/${dayId}/events`,
@@ -146,12 +174,12 @@ function Mastertour(config = {}) {
 
 		logger.debug("parsing show data...")
 		rawEvents.forEach(event => {
-			events.push(parseShow(event))
+			events.push(new ShowSchema(event))
 		})
 		return events
 	}
 
-	// TEST //
+	//! this does something
 	this.test = async function() {
 		let res = await axios.get("https://my.eventric.com/portal/api/v5/tours", req).catch(err => {
 			throw new Error(err)
@@ -159,88 +187,41 @@ function Mastertour(config = {}) {
 		let data = res.data
 	}
 
-
-	function parseDay(input) {
-		let newSchedule = []
-		input.scheduleItems.forEach(item => {
-			newSchedule.push(parseScheduleEvent(item))
+	//! this retusrns help
+	this.help = function() {
+		const util = require("util")
+		const fs = require("fs")
+		let x = fs.readFileSync(__filename, "utf8")
+		let methods = []
+		// console.log(x)
+		let matches = x.match(/\/\/\!.+(.|\n).+?$/mgi)
+			// console.log(matches)
+		matches.forEach(match => {
+			match = match.split("\n")
+			let description = match[0].replace("//!" ,"").trim()
+			let name = match[1].match(/(?<=this\.).+?(?=\s|\=)/gi)
+			if (name) name = name[0]
+			if (name) methods.push({name, description})
 		})
-		let date = new Date(input.dayDate)
-		let schema = {
-			name: input.name,
-			date: date,
-			dateString: dateformat(date, "mmmm dd, yyyy"),
-			city: input.city,
-			state: input.state,
-			country: input.country,
-			notes: input.generalNotes,
-			hotelNotes: input.hotelNotes,
-			travelNotes: input.travelNotes,
-			schedule: newSchedule
-		}
-		return schema
+		// for (let [k, v] of Object.entries(this)) {
+		// 	let x = util.inspect(k)
+		// 	console.log(x)
+		// }
+		// console.table(methods)
+		console.log("mastertour help\n")
+		let list = methods.map(x => `${x.name} - ${x.description}`).join("\n")
+		console.log(list)
 	}
+}
 
-	function parseShow(input) {
-		// console.log(input)
-		let schema = {
-			eventName: input.eventName,
-			venueName: input.venueName,
-			fullAddress: undefined,
-			street: input.venueAddressLine1,
-			city: input.venueCity,
-			state: input.venueState,
-			zipCode: input.venueZip,
-			country: input.venueCountry,
-			capacity: input.venueCapacity,
-			type: input.venueType,
-			timeZone: input.venueTimeZone,
-			url: input.venuePrimaryUrl,
-			contacts: input.venueContacts
-		}
-		schema.fullAddress = `${schema.street}, ${schema.city}, ${schema.state}, ${schema.zipCode}`
-		return schema
-	}
+class ERROR extends Error {
+	constructor(input) {
+		super()
 
-	// PARSE SCHEDULE EVENT // returns simplified event
-	function parseScheduleEvent(input) {
-		console.log(input)
-		let start = new Date(input.startDatetime)
-		let end = new Date(input.endDatetime)
-
-		let timeZone = input.dayTimeZone
-		let schema = {
-			time: dateformat(start, ("h:MMTT")),
-			title: input.title,
-			details: input.details,
-			start: start,
-			end: end,
-			startString: start.toLocaleString({timeZone}),
-			timeZone: timeZone,
-			id: input.id,
-			dayId: input.parentDayId
-		}
-
-		return schema
+		if (true) {}
 	}
 }
 
 
-
-let mastertour = new Mastertour({
-	key: process.env.MASTERTOUR_KEY,
-	secret: process.env.MASTERTOUR_SECRET,
-	tourId: "35c66c4606b76ae73be2eaf54ee396c59a9bf36d"
-})
-
-let tourId = "35c66c4606b76ae73be2eaf54ee396c59a9bf36d"
-let dayId = "7381aa0c16133f117b59920961a5af4b50ccf36f"
-
-// mastertour.getTour().then(console.log)
-// mastertour.getTour().then(console.log)
-// mastertour.getToday().then(console.log)
-mastertour.getDate("mar 22").then(console.log)
-
-
-
+module.exports = Mastertour
 
