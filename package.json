@@ -1,11 +1,37 @@
 {
+
+  "name": "mastertour",
+  "description": "mastertour API",
+  "version": "1.0.4",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryanfarber/mastertour.git"
+  },
+  "keywords": [
+    "mastertour",
+    "music",
+    "api",
+    "tour",
+    "event management",
+    "eventric"
+  ],
   "dependencies": {
-    "@ryanforever/logger": "^4.0.2",
-    "axios": "^0.26.1",
+    "@ryanforever/logger": "^5.0.1",
+    "axios": "^0.27.2",
     "dateformat": "^4.6.3",
     "oauth-1.0a": "^2.2.6"
   },
   "devDependencies": {
-    "dotenv": "^16.0.0"
-  }
+    "dotenv": "^16.0.1"
+  },
+  "author": "ryan forever",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ryanfarber/mastertour/issues"
+  },
+  "homepage": "https://github.com/ryanfarber/mastertour#readme"
 }

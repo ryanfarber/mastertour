@@ -31,7 +31,6 @@ function Oath(config = {}) {
         }
     })
 
-
     this.create = function(requestData) {
         return oauth.authorize(requestData)
     }
