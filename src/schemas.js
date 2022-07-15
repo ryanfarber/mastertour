@@ -54,6 +54,7 @@ function DaySchema(d = {}) {
 	this.hotelNotes = d.hotelNotes
 	this.travelNotes = d.travelNotes
 	this.schedule = newSchedule
+	this.tourId = d.tourId
 	this.raw = undefined
 
 	this.type = parseDayType(d.dayType) || parseDayType(d.name)

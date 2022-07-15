@@ -26,7 +26,7 @@ function Mastertour(config = {}) {
 		consumerKey: key,
 		consumerSecret: secret,
 	})
-
+	this.tourId = defaultTourId
 
 	//! get a list of all tours on master tour
 	this.getTours = async function() {
@@ -103,8 +103,7 @@ function Mastertour(config = {}) {
 		logger.debug("parsing day...")
 		// console.log(data)
 		let parsed = new DaySchema(data)
-		console.log(parsed)
-		// return data
+		return parsed
 	}
 
 
@@ -126,6 +125,7 @@ function Mastertour(config = {}) {
 	//! get a specific date of the tour
 	this.getDate = async function(inputDate) {
 		logger.debug("getting specified date...")
+		tourId = defaultTourId
 		let tour = await this.getTour(tourId)
 		let year = new Date(inputDate).getFullYear()
 		let currentYear = new Date(Date.now()).getFullYear()
@@ -137,7 +137,7 @@ function Mastertour(config = {}) {
 		
 		logger.debug(`selected date: ${selectedDate}`)
 		let match = tour.days.find(day => {
-			let date = new Date(day.dayDate).toLocaleDateString()
+			let date = new Date(day.date).toLocaleDateString()
 			return date == selectedDate
 		})
 		if (!match) return undefined
@@ -177,6 +177,30 @@ function Mastertour(config = {}) {
 			events.push(new ShowSchema(event))
 		})
 		return events
+	}
+
+
+	this.getCrew = async function(tourId) {
+		// logger.deprecated("not working")
+		tourId = tourId || this.tourId
+		logger.debug(`getting crew for tour ${tourId}...`)
+
+		let request = {
+			url: `https://my.eventric.com/portal/api/v5/tour/${tourId}/crew`,
+			method: "GET",
+			data: { version: 10 }
+		}
+		let req = { params: oath.create(request)}
+		req.params.version = 10
+
+		let res = await axios.get(request.url, req).catch(err => {
+			let msg = err?.response?.data?.message
+			if (msg) throw new Error(msg)
+			else throw new Error(err)
+		})
+
+		let data = res?.data?.data?.crew
+		return data
 	}
 
 	//! this does something
